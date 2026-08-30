@@ -1,0 +1,42 @@
+flowchart LR
+  subgraph UVM["UVM Verification Environment"]
+    TEST["Directed UVM Tests\nTC01–TC11"] --> SEQ["APB Sequences"]
+    SEQ --> SQR["APB Sequencer"]
+    SQR --> DRV["APB Driver"]
+    APBM["APB Monitor"] -->|"APB transactions"| SB["Scoreboard\nExpected Queue + Checks"]
+    APBM -->|"coverage samples"| COV["Functional Coverage"]
+    UARTM["UART Monitor\nFrame Decoder"] -->|"decoded UART bytes"| SB
+  end
+
+  subgraph TOP["tb_top + apb_uart_if"]
+    IF["APB/UART Virtual Interface\nPCLK · PRESETn · APB4 · UART status"]
+  end
+
+  subgraph DUT["Sync_FIFO DUT"]
+    DEC["APB4 Slave + Address Decode\nPREADY · PRDATA · PSLVERR"]
+    REG["Register Block\nDepth config @ 0x0000_0000\nStatus @ 0x0000_0020"]
+    FIFO["Configurable Synchronous FIFO\n8-bit × 8/16/32/64/128/256\nmem · w_ptr · r_ptr · count"]
+    BRIDGE["FIFO → UART Handshake\nr_ready/r_valid · tx_start"]
+    UART["UART TX FSM\nIDLE → START → DATA → STOP\nbaud divider (0 protected as 1)"]
+    DEC --> REG
+    DEC -->|"write byte @ 0x8000_0000"| FIFO
+    REG -->|"fifo_depth"| FIFO
+    FIFO -->|"head byte"| BRIDGE
+    BRIDGE -->|"tx_data + tx_start"| UART
+    FIFO -->|"full · empty · count"| REG
+  end
+
+  DRV -->|"drives APB4"| IF
+  IF -->|"APB4 + reset + baud_div"| DEC
+  DEC -->|"APB response"| IF
+  IF -. "sample APB" .-> APBM
+  UART -->|"uart_tx_o · busy · done"| IF
+  IF -. "sample serial line" .-> UARTM
+
+  classDef uvm fill:#eaf2ff,stroke:#2563eb,color:#102a56,stroke-width:2px;
+  classDef dut fill:#ecfdf5,stroke:#059669,color:#103b31,stroke-width:2px;
+  classDef check fill:#fff7ed,stroke:#ea580c,color:#54240d,stroke-width:2px;
+  class TEST,SEQ,SQR,DRV,APBM,UARTM uvm;
+  class DEC,REG,FIFO,BRIDGE,UART dut;
+  class SB,COV check;
+
