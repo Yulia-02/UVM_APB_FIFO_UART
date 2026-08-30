@@ -11,7 +11,9 @@ APB4 → FIFO → UART TX → uart_tx_o
 ```
 
 A UVM verification environment was developed to verify the complete data path, FIFO status behavior, APB error handling, reset behavior, and corner cases.
+## Architecture
 
+![APB FIFO UART UVM Architecture](architecture/uvm_apb_fifo_uart_architecture.svg)
 ## DUT Features
 
 - AMBA APB4 slave interface
