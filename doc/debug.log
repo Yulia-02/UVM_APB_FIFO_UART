@@ -1,0 +1,82 @@
+Bug1 - Premature Test Termination
+Problem
+APB完成写入 FIFO 变成empty=1 但最后一个uart transaction实际还没发送完成
+Test把 empty=1 当成整个数据路径完成的判断条件 所以过早地执行了drop_objection() 导致simulation提前结束 
+最后一个uart byte可能处于发送过程中 monitor/scoreboard还没来得及完成接收和比较
+
+Fix
+将 wait(vif.empty == 1); 改成 wait(vif.empty == 1); wait(vif.uart_tx_busy == 0);
+同时 scoreboard 维护 expected_queue wait(expected_queue.size() == 0);
+并且在 scoreboard 添加 check_phase() 再次检查 expected_queue.size() == 0;
+
+
+Bug2 - Scoreboard False Failure
+Problem
+在验证 APB read FIFO status test 时 scoreboard 报 (Expected_status = 32'h0000_0001) != (Actual_status = 32'h0000_0008)
+发现 Expected value 直接被写死成 reset 后的值 (empty=1 full=0 count=0)
+但是 status register 是 state-dependent 的 它取决于之前发生了多少 APB write、UART 已经消费了多少数据以及当前 FIFO depth (empty=0 full=0 count=2)
+
+Fix
+不再把 reset status hard-code 成所有 Status Read 的 expected value
+对于 TC06 根据已知 test state 生成 expected value
+对于涉及复杂 APB/UART concurrent behavior 的动态 status checking 认识到当前 scoreboard 的预测能力有限
+如果进一步完善，我会加入一个 predictor/reference model 同时跟踪 APB producer 和 UART consumer 的 transaction 动态维护 expected FIFO occupancy
+
+
+Bug3 - FIFO Full with Concurrent UART Consumption
+Problem
+为了测试 FIFO full 的情况 FIFO depth 配置为 8 时 test 连续执行了 8 次 FIFO write
+原本预期 full = 1 但 simulation 发现 full != 1 甚至 test 添加 wait(full==1); simulation 一直等下去
+发现 APB 在向 FIFO 写数据的同时 uart 也不断从 FIFO 中取数据
+由于两者并发进行 所以 FIFO occupancy 该理解成 occupancy = accepted_writes - completed_reads 而不是 occupancy = total_write_count
+
+Fix
+配置一个场景让 producer rate 明显高于 consumer rate
+同时为了避免 test 因错误 assumption 永久 hang 增加 timeout 输出信息
+
+
+Bug4 - late PSLVERR Sampling Timing
+Problem
+非法 APB 地址测试时出现 false failure
+Test 报告 PSLVERR 没有拉高，但是检查 waveform 发现 DUT 在 APB transfer 的有效阶段实际上正确地产生了 PSLVERR
+问题在 verification environment: test 是在 sequence 完成后直接读取 interface 上的 PSLVERR 但 PSLVERR 是一个 transaction-level 的瞬时响应 
+APB transaction 结束以后它已经恢复成 0 所以 test 采样太晚了
+
+Fix
+在 APB monitor 中，在 PSEL && PENABLE && PREADY 的有效传输阶段采样 PSLVERR 并保存到 apb_transaction.slverr 让 scoreboard 基于 transaction 做检查 
+
+
+Bug5 - UART Monitor Was Not Reset-Aware During Mid-Frame Reset
+Problem
+做 reset test 时发现 DUT reset 状态都正确，但 UART scoreboard 仍然失败
+先通过 waveform 确认 reset 后 DUT 能重新发送数据，因此把问题缩小到 verification environment
+发现 UART monitor 原本假设一帧一旦开始就一定完整结束，所以 reset 打断 frame 后 monitor 仍继续采样
+
+原monitor隐含一个假设就是一旦检测到UART start bit 这一帧一定会完整发送结束 所以会采完整个frame 并没有考虑中途reset
+如果按原来的节奏继续采集 它可能会把reset前半帧+reset后idle+新帧的一部分拼成一个假的transaction
+
+Fix
+给monitor增加reset-aware机制 用两个并行线程
+Thread1:decode UART
+Thread2:watch reset
+通过fork……join_any让完整的frame和reset竞争 谁先发生就结束当前transaction 再用disable folk 杀掉另一个线程
+
+Bug6 - UART Monitor Sampling Race at Minimum Baud Divider
+Problem
+做 baud_div_zero_test 时 DUT 对 baud_div = 0 的保护逻辑能够正常触发
+if (baud_div == 16'd0)
+    effective_baud_div = 16'd1;
+因此 UART 实际使用 effective_baud_div = 1, 也就是每个 UART bit 只持续 1 个 PCLK cycle
+Test 写入 expected = 0xA5, 但 UART monitor actual = 0x4A, scoreboard 报 FAIL 
+进一步观察发现 A5 = 1010_0101 4A = 0100_1010 错误数据呈现明显的 1-bit shift, 因此问题不像 DUT 数据损坏, 更像 UART monitor 的 sampling alignment 出现问题
+DUT 和 monitor 都在 posedge PCLK 操作 uart_tx_o 
+DUT 使用 nonblocking assignment 在 NBA region 更新 tx_o 而 monitor 也在同一个 posedge 采样, 因此 monitor 可能读到 previous bit
+正常 baud_div = 4 时，一个 UART bit 会保持多个 clock cycle, 这个问题没有明显暴露
+
+Fix
+首先让 monitor 和 DUT 对 baud_div = 0 使用相同的解释
+if (vif.uart_baud_div == 16'd0)
+    monitor_baud_div = 1;
+else
+    monitor_baud_div = vif.uart_baud_div;
+调整 UART monitor 的 sampling timing, 即 monitor 在 DUT 更新后的半个 clock cycle 再采样 UART output, 避免与 DUT 的 NBA update 发生 sampling race

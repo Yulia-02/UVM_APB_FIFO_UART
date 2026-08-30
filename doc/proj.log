@@ -1,0 +1,60 @@
+07/17/2026: Completed the implementation of the UART TX module.
+07/18/2026:
+07/19/2026:
+07/20/2026: Created a standalone testbench and successfully verified the UART TX functionality in QuestaSim.
+07/21/2026:
+07/22/2026:
+07/23/2026:
+07/24/2026: Completed the integration of the UART transmitter with the FIFO DUT.
+07/25/2026:
+07/26/2026:
+07/27/2026: Designed a testbeach for the whole FIFO DUT.
+07/28/2026: Created the interface and apb transaction structure of UVM environment for the DUT.
+07/29/2026: Created uart transaction structure of UVM environment for the DUT.
+07/30/2026: Completed the UVM package setup.
+07/31/2026: Implemented the APB write sequence and successfully compiled the UVM package.
+08/01/2026:
+08/02/2026:
+08/03/2026: Implemented the APB driver and successfully compiled the updated UVM package.
+08/04/2026: Implemented the APB sequencer and successfully compiled the updated UVM package.
+08/05/2026: Started building APB monitor but leaving run_phase not done.
+08/06/2026: Found myself weak in SystemVerilog so spent several days learning OOP.
+08/07/2026: 
+08/08/2026:
+08/09/2026:
+08/10/2026: Completed APB monitor and successfully compiled the latest UVM package.
+08/11/2026: Completed UART monitor and APB agent of UVM environment.
+08/12/2026:
+08/13/2026: Implemented scoreboard and compiled the updated UVM package successfully.
+08/14/2026: Finished env and test, wrote tb_top, started testing first write case.
+08/15/2026:
+08/16/2026:
+08/17/2026: Passed TC01 write_test and TC02 multi_write_test successfually.
+08/18/2026: Passed TC03 data_pattern_test, TC04 full_test and TC05 empty_test successfully.
+08/19/2016: Passed TC06 status_read_test and TC07 invalid_addr_test successfully.
+08/20/2026: Passed TC08 depth_config_test successfully.
+08/21/2026: Passed TC09 reset_test successfully.
+08/22/2026:
+08/23/2026:
+08/24/2026:
+08/25/2026: Function coverage achieved 100% smoothly.
+08/26/2026: Initially tested code coverage up to 76.10% and added read-pointer wrap-around testcase to increase coverage holes.
+08/27/2026:
+08/28/2026:
+08/29/2026:
+08/30/2026: Finally achieved 78.47% code coverage through adding exclusion for unreachable logic and testcases for reachable corner cases.
+
+Functional Coverage: 100%
+
+Targeted Code Coverage Closure:
+- FIFO write-pointer wrap: covered
+- FIFO read-pointer wrap: covered
+- UART baud_div=0 protection: covered
+- UART FSM default branch: excluded as unreachable defensive logic
+
+Regression:
+- All planned tests executed
+- UVM_ERROR = 0
+- UVM_FATAL = 0
+
+Final filtered coverage: 78.47%

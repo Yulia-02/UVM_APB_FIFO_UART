@@ -1,0 +1,18 @@
+rm -rf work
+vlib work
+
+vlog -sv ../interface/apb_uart_if.sv
+vlog -sv ../../dut/uart.sv
+vlog -sv ../../dut/fifo_uart.sv
+vlog -sv apb_uart_pkg.sv
+vlog -sv ../tb_top.sv
+
+
+// code coverage
+vlog +cover=bcesft ../../dut/uart.sv
+vlog +cover=bcesft ../../dut/fifo_uart.sv
+vlog ../interface/apb_uart_if.sv
+vlog apb_uart_pkg.sv
+vlog ../tb_top.sv
+
+do ../regression.do

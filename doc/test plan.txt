@@ -1,0 +1,237 @@
+TEST CASES
+------------------------------------------------------------
+TC01 - Basic APB FIFO Write to UART -- PASS ✅
+------------------------------------------------------------
+
+Objective:
+    Verify the basic APB -> FIFO -> UART data path.
+
+Stimulus:
+    Configure FIFO.
+    Write one byte (for example 0x55) to FIFO through APB.
+
+Expected Result:
+    UART transmits 0x55.
+    Scoreboard reports PASS.
+
+------------------------------------------------------------
+TC02 - Multiple FIFO Writes -- PASS ✅
+------------------------------------------------------------
+
+Objective:
+    Verify multiple bytes are transmitted in the same order
+    in which they were written.
+
+Stimulus:
+
+    APB writes:
+
+        0x55
+        0xA5
+        0x3C
+
+Expected Queue:
+
+        [55][A5][3C]
+
+Expected UART Output:
+
+        0x55
+        0xA5
+        0x3C
+
+------------------------------------------------------------
+TC03 - UART Data Pattern Test -- PASS ✅
+------------------------------------------------------------
+
+Objective:
+    Verify UART transmission for different bit patterns.
+
+Stimulus:
+
+    Write values such as:
+
+        0x00
+        0xFF
+        0x55
+        0xAA
+        0x01
+        0x80
+
+Expected Result:
+    UART output matches every APB FIFO write.
+
+------------------------------------------------------------
+TC04 - FIFO Full Test -- PASS ✅
+------------------------------------------------------------
+
+Objective:
+    Verify FIFO full behavior.
+
+Stimulus:
+    Configure a FIFO depth.
+    Write enough data to reach the configured FIFO capacity.
+
+Expected Result:
+    FIFO full flag is asserted at the correct condition.
+    FIFO count/status is correct.
+    
+------------------------------------------------------------
+TC05 - FIFO Empty Test -- PASS ✅
+------------------------------------------------------------
+
+Objective:
+    Verify FIFO empty behavior.
+
+Stimulus:
+    Reset DUT.
+    Do not write FIFO data.
+
+Expected Result:
+    FIFO empty flag is asserted.
+    FIFO status indicates empty.
+    No unexpected UART data should be transmitted.
+
+------------------------------------------------------------
+TC06 - APB Status Read -- PASS ✅
+------------------------------------------------------------
+
+Objective:
+    Verify APB read transactions and FIFO status information.
+
+Stimulus:
+    Write data into FIFO.
+    Perform APB read of the status register.
+
+Check:
+
+    - data_count
+    - full
+    - empty
+
+Expected Result:
+    PRDATA contains the correct FIFO status.
+
+------------------------------------------------------------
+TC07 - Invalid Address / PSLVERR -- PASS ✅
+------------------------------------------------------------
+
+Objective:
+    Verify APB error handling for invalid addresses.
+
+Stimulus:
+    Perform an APB transaction to an invalid address,
+    for example 0x0000_0040.
+
+Check:
+
+    - addr_valid
+    - PSLVERR
+    - FIFO state is not modified
+    - No unexpected UART data is transmitted
+
+Expected Result:
+    PSLVERR is asserted for the invalid APB access.
+    The invalid transaction does not write data into the FIFO.
+    FIFO count/status remains unchanged.
+    No unexpected UART transaction is generated.
+    
+------------------------------------------------------------
+TC08 - FIFO Depth Configuration --PASS ✅
+------------------------------------------------------------
+
+Objective:
+    Verify supported FIFO depth configuration.
+
+Configuration values to test:
+
+    depth = 8
+    depth = 16
+    depth = 32
+    depth = 64
+    depth = 128
+    depth = 256
+
+Expected Result:
+    DUT uses the selected FIFO depth correctly.
+    Status/configuration register reflects the expected setting.
+
+
+------------------------------------------------------------
+TC09 - Reset During Active UART Transmission -- PASS ✅
+------------------------------------------------------------
+
+Objective:
+    Verify DUT behavior when reset is asserted while
+    FIFO/UART activity is in progress.
+
+Stimulus:
+    1. Write multiple data bytes into FIFO through APB.
+    2. Wait until UART transmission starts.
+    3. Assert PRESETn while uart_tx_busy = 1.
+    4. Release reset.
+
+Check:
+    - FIFO count returns to 0.
+    - empty = 1.
+    - full = 0.
+    - uart_tx_busy = 0.
+    - uart_tx_o = 1 (UART idle).
+    - Previous FIFO data is discarded.
+    - No stale transaction remains after reset.
+
+Expected Result:
+    DUT immediately returns to its reset/idle state.
+    FIFO contents are cleared logically.
+    UART transmission is aborted cleanly.
+    DUT can accept new APB transactions after reset.
+
+
+------------------------------------------------------------
+TC10 - FIFO Read Pointer Wrap-Around
+------------------------------------------------------------
+
+Objective:
+    Verify that the FIFO read pointer wraps from the last
+    valid FIFO entry back to address 0 correctly.
+
+Stimulus:
+    1. Configure FIFO depth to 8.
+    2. Write enough data so that UART consumption advances
+       r_ptr through all FIFO locations.
+    3. Allow at least 8 FIFO-to-UART read handshakes.
+    4. Continue transmission after r_ptr reaches depth-1.
+
+Check:
+    - r_ptr reaches 7.
+    - After the next FIFO read, r_ptr wraps to 0.
+    - UART data ordering remains correct.
+    - Scoreboard reports no mismatches.
+
+Expected Result:
+    Read pointer wraps correctly from 7 to 0 without
+    data loss or ordering errors.
+
+
+------------------------------------------------------------
+TC11 - UART Zero Baud Divider Boundary
+------------------------------------------------------------
+
+Objective:
+    Verify DUT behavior when uart_baud_div is configured
+    to zero.
+
+Stimulus:
+    1. Set uart_baud_div = 0.
+    2. Write one valid byte into FIFO through APB.
+    3. Allow FIFO -> UART transmission to occur.
+
+Check:
+    - UART does not hang.
+    - UART transmission starts and completes.
+    - UART monitor decodes the expected data correctly.
+    - Scoreboard reports no mismatch.
+
+Expected Result:
+    DUT handles baud_div = 0 according to the RTL fallback
+    behavior and completes UART transmission correctly.
